@@ -23,6 +23,8 @@
 #include "ORBmatcher.h"
 #include <thread>
 
+#include "easy/profiler.h"
+
 namespace ORB_SLAM2
 {
 
@@ -246,10 +248,12 @@ void Frame::AssignFeaturesToGrid()
 
 void Frame::ExtractORB(int flag, const cv::Mat &im)
 {
+    EASY_BLOCK("ORB_EXTRACTION", profiler::colors::Brown200);
     if(flag==0)
         (*mpORBextractorLeft)(im,cv::Mat(),mvKeys,mDescriptors);
     else
         (*mpORBextractorRight)(im,cv::Mat(),mvKeysRight,mDescriptorsRight);
+    EASY_END_BLOCK
 }
 
 void Frame::SetPose(cv::Mat Tcw)

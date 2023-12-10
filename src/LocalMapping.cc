@@ -25,6 +25,8 @@
 
 #include<mutex>
 
+#include "easy/profiler.h"
+
 namespace ORB_SLAM2
 {
 
@@ -46,7 +48,7 @@ void LocalMapping::SetTracker(Tracking *pTracker)
 
 void LocalMapping::Run()
 {
-
+    EASY_BLOCK("LOCAL_MAPPING_THREAD", profiler::colors::Green50);
     mbFinished = false;
 
     while(1)
@@ -78,7 +80,13 @@ void LocalMapping::Run()
             {
                 // Local BA
                 if(mpMap->KeyFramesInMap()>2)
+                {
+                    EASY_BLOCK("LOCAL_BUNDLE_ADJUSTMENT", profiler::colors::Cyan400);
+                    /// Local Bundle Adjustment : 쓸모 없는 keyframe을 찾아 삭제
+                    /// 삭제 기준은, keyframe이 보고있는 map points 중, 최소 3개 이상의 keyframes에서 90% 이상 겹쳐지는 경우
                     Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
+                    EASY_END_BLOCK
+                }
 
                 // Check redundant local Keyframes
                 KeyFrameCulling();
@@ -109,6 +117,7 @@ void LocalMapping::Run()
     }
 
     SetFinish();
+    EASY_END_BLOCK
 }
 
 void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
@@ -127,6 +136,7 @@ bool LocalMapping::CheckNewKeyFrames()
 
 void LocalMapping::ProcessNewKeyFrame()
 {
+    EASY_BLOCK("KEYFRAME_INSERTION", profiler::colors::Pink100);
     {
         unique_lock<mutex> lock(mMutexNewKFs);
         mpCurrentKeyFrame = mlNewKeyFrames.front();
@@ -165,10 +175,12 @@ void LocalMapping::ProcessNewKeyFrame()
 
     // Insert Keyframe in Map
     mpMap->AddKeyFrame(mpCurrentKeyFrame);
+    EASY_END_BLOCK
 }
 
 void LocalMapping::MapPointCulling()
 {
+    EASY_BLOCK("RECENT_MAP_POINTS_CULLING", profiler::colors::Green400);
     // Check Recent Added MapPoints
     list<MapPoint*>::iterator lit = mlpRecentAddedMapPoints.begin();
     const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
@@ -202,10 +214,12 @@ void LocalMapping::MapPointCulling()
         else
             lit++;
     }
+    EASY_END_BLOCK
 }
 
 void LocalMapping::CreateNewMapPoints()
 {
+    EASY_BLOCK("NEW_MAP_POINTS_CREATION", profiler::colors::Red);
     // Retrieve neighbor keyframes in covisibility graph
     int nn = 10;
     if(mbMonocular)
@@ -449,6 +463,7 @@ void LocalMapping::CreateNewMapPoints()
             nnew++;
         }
     }
+    EASY_END_BLOCK
 }
 
 void LocalMapping::SearchInNeighbors()
@@ -631,6 +646,7 @@ void LocalMapping::InterruptBA()
 
 void LocalMapping::KeyFrameCulling()
 {
+    EASY_BLOCK("LOCAL_KEYFRAME_CULLING", profiler::colors::DarkMagenta);
     // Check redundant keyframes (only local keyframes)
     // A keyframe is considered redundant if the 90% of the MapPoints it sees, are seen
     // in at least other 3 keyframes (in the same or finer scale)
@@ -693,6 +709,7 @@ void LocalMapping::KeyFrameCulling()
         if(nRedundantObservations>0.9*nMPs)
             pKF->SetBadFlag();
     }
+    EASY_END_BLOCK
 }
 
 cv::Mat LocalMapping::SkewSymmetricMatrix(const cv::Mat &v)

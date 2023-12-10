@@ -31,6 +31,7 @@
 #include<mutex>
 #include<thread>
 
+#include "easy/profiler.h"
 
 namespace ORB_SLAM2
 {
@@ -56,6 +57,7 @@ void LoopClosing::SetLocalMapper(LocalMapping *pLocalMapper)
 
 void LoopClosing::Run()
 {
+    EASY_BLOCK("LOOP_CLOSING_THREAD", profiler::colors::Orange100);
     mbFinished =false;
 
     while(1)
@@ -85,6 +87,7 @@ void LoopClosing::Run()
     }
 
     SetFinish();
+    EASY_END_BLOCK
 }
 
 void LoopClosing::InsertKeyFrame(KeyFrame *pKF)
@@ -102,6 +105,7 @@ bool LoopClosing::CheckNewKeyFrames()
 
 bool LoopClosing::DetectLoop()
 {
+    EASY_BLOCK("LOOP_CANDIDATES_DETECTION", profiler::colors::Pink);
     {
         unique_lock<mutex> lock(mMutexLoopQueue);
         mpCurrentKF = mlpLoopKeyFrameQueue.front();
@@ -214,6 +218,8 @@ bool LoopClosing::DetectLoop()
     // Add Current Keyframe to database
     mpKeyFrameDB->add(mpCurrentKF);
 
+    EASY_END_BLOCK
+
     if(mvpEnoughConsistentCandidates.empty())
     {
         mpCurrentKF->SetErase();
@@ -230,6 +236,7 @@ bool LoopClosing::DetectLoop()
 
 bool LoopClosing::ComputeSim3()
 {
+    EASY_BLOCK("COMPUTE_THE_SIMILARITY_TRANSFORMATION", profiler::colors::LightGreen100);
     // For each consistent loop candidate we try to compute a Sim3
 
     const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
@@ -396,11 +403,17 @@ bool LoopClosing::ComputeSim3()
         mpCurrentKF->SetErase();
         return false;
     }
-
+    EASY_END_BLOCK
 }
 
+/*
+ * 중복된 map points를 하나로 합치고, covisivility graph에 새 edge를 넣어준다.
+ * Loop keyframe과 그의 이웃에 있는 모든 map points를 covisivility graph에서 reprojection
+ * -> matching -> matching된 map points 들을 같은 것이라 생각하고 fusing
+ */
 void LoopClosing::CorrectLoop()
 {
+    EASY_BLOCK("LOOP_FUSION", profiler::colors::RedA100);
     cout << "Loop detected!" << endl;
 
     // Send a stop signal to Local Mapping
@@ -541,7 +554,6 @@ void LoopClosing::CorrectLoop()
     // Fuse duplications.
     SearchAndFuse(CorrectedSim3);
 
-
     // After the MapPoint fusion, new links in the covisibility graph will appear attaching both sides of the loop
     map<KeyFrame*, set<KeyFrame*> > LoopConnections;
 
@@ -563,14 +575,17 @@ void LoopClosing::CorrectLoop()
         }
     }
 
+    EASY_BLOCK("ESSENTIAL_GRAPH_OPTIMIZATION", profiler::colors::Purple100);
     // Optimize graph
     Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, NonCorrectedSim3, CorrectedSim3, LoopConnections, mbFixScale);
+    EASY_END_BLOCK
 
     mpMap->InformNewBigChange();
 
     // Add loop edge
     mpMatchedKF->AddLoopEdge(mpCurrentKF);
     mpCurrentKF->AddLoopEdge(mpMatchedKF);
+    EASY_END_BLOCK
 
     // Launch a new thread to perform Global Bundle Adjustment
     mbRunningGBA = true;
@@ -644,11 +659,14 @@ void LoopClosing::ResetIfRequested()
 
 void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 {
+    EASY_BLOCK("FULL_BUNDLE_ADJUSTMENT", profiler::colors::Cyan400);
     cout << "Starting Global Bundle Adjustment" << endl;
 
     int idx =  mnFullBAIdx;
     Optimizer::GlobalBundleAdjustemnt(mpMap,10,&mbStopGBA,nLoopKF,false);
+    EASY_END_BLOCK
 
+    EASY_BLOCK("UPDATE_MAP", profiler::colors::DeepOrange300);
     // Update all MapPoints and KeyFrames
     // Local Mapping was active during BA, that means that there might be new keyframes
     // not included in the Global BA and they are not consistent with the updated map.
@@ -746,6 +764,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
         mbFinishedGBA = true;
         mbRunningGBA = false;
     }
+    EASY_END_BLOCK
 }
 
 void LoopClosing::RequestFinish()

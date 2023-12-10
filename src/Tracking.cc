@@ -37,6 +37,8 @@
 
 #include<mutex>
 
+#include "easy/profiler.h"
+
 
 using namespace std;
 
@@ -237,6 +239,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
 
 cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
 {
+    EASY_BLOCK("GRAB_IMAGE", profiler::colors::Teal);
     mImGray = im;
 
     if(mImGray.channels()==3)
@@ -258,6 +261,7 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
         mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
     else
         mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    EASY_END_BLOCK
 
     Track();
 
@@ -266,6 +270,7 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
 
 void Tracking::Track()
 {
+    EASY_BLOCK("TRACKING", profiler::colors::Silver);
     if(mState==NO_IMAGES_YET)
     {
         mState = NOT_INITIALIZED;
@@ -453,9 +458,11 @@ void Tracking::Track()
             }
             mlpTemporalPoints.clear();
 
+            EASY_BLOCK("NEW_KEYFRAME_DECISION", profiler::colors::Red);
             // Check if we need to insert a new keyframe
             if(NeedNewKeyFrame())
                 CreateNewKeyFrame();
+            EASY_END_BLOCK
 
             // We allow points with high innovation (considererd outliers by the Huber Function)
             // pass to the new keyframe, so that bundle adjustment will finally decide
@@ -467,6 +474,7 @@ void Tracking::Track()
                     mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
             }
         }
+
 
         // Reset if the camera get lost soon after initialization
         if(mState==LOST)
@@ -502,7 +510,7 @@ void Tracking::Track()
         mlFrameTimes.push_back(mlFrameTimes.back());
         mlbLost.push_back(mState==LOST);
     }
-
+    EASY_END_BLOCK
 }
 
 
@@ -562,7 +570,7 @@ void Tracking::StereoInitialization()
 
 void Tracking::MonocularInitialization()
 {
-
+    EASY_BLOCK("MAP_INITIALIZATION", profiler::colors::Blue);
     if(!mpInitializer)
     {
         // Set Reference Frame
@@ -632,6 +640,7 @@ void Tracking::MonocularInitialization()
             CreateInitialMapMonocular();
         }
     }
+    EASY_END_BLOCK
 }
 
 void Tracking::CreateInitialMapMonocular()
@@ -863,9 +872,12 @@ void Tracking::UpdateLastFrame()
             break;
     }
 }
-
+/**
+ * @brief Initial pose estimation from previous frame.
+ */
 bool Tracking::TrackWithMotionModel()
 {
+    EASY_BLOCK("INITIAL_POSE_ESTIMATION_FROM_PREVIOUS_FRAME", profiler::colors::Gold);
     ORBmatcher matcher(0.9,true);
 
     // Update last frame pose according to its reference keyframe
@@ -894,8 +906,10 @@ bool Tracking::TrackWithMotionModel()
     if(nmatches<20)
         return false;
 
+    EASY_BLOCK("MOTION_ONLY_BA", profiler::colors::Indigo);
     // Optimize frame pose with all matches
     Optimizer::PoseOptimization(&mCurrentFrame);
+    EASY_END_BLOCK
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -916,7 +930,8 @@ bool Tracking::TrackWithMotionModel()
             else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
                 nmatchesMap++;
         }
-    }    
+        EASY_END_BLOCK
+    }
 
     if(mbOnlyTracking)
     {
@@ -927,8 +942,12 @@ bool Tracking::TrackWithMotionModel()
     return nmatchesMap>=10;
 }
 
+/**
+ * @brief Track local map
+ */
 bool Tracking::TrackLocalMap()
 {
+    EASY_BLOCK("LOCAL_MAP_TRACKING", profiler::colors::Lime200);
     // We have an estimation of the camera pose and some map points tracked in the frame.
     // We retrieve the local map and try to find matches to points in the local map.
 
@@ -936,7 +955,7 @@ bool Tracking::TrackLocalMap()
 
     SearchLocalPoints();
 
-    // Optimize Pose
+    /// Optimize Pose : Motion Only Bundle Adjustment
     Optimizer::PoseOptimization(&mCurrentFrame);
     mnMatchesInliers = 0;
 
@@ -962,6 +981,7 @@ bool Tracking::TrackLocalMap()
         }
     }
 
+    EASY_END_BLOCK
     // Decide if the tracking was succesful
     // More restrictive if there was a relocalization recently
     if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<50)
@@ -1338,8 +1358,12 @@ void Tracking::UpdateLocalKeyFrames()
     }
 }
 
+/**
+ * @brief Initial Pose Estimation via Global Relocalization.
+ */
 bool Tracking::Relocalization()
 {
+    EASY_BLOCK("INITIAL_POSE_ESTIMATION_VIA_GLOBAL_RELOCALIZATION", profiler::colors::DarkCyan);
     // Compute Bag of Words Vector
     mCurrentFrame.ComputeBoW();
 
@@ -1489,6 +1513,7 @@ bool Tracking::Relocalization()
         }
     }
 
+    EASY_END_BLOCK
     if(!bMatch)
     {
         return false;

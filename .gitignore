@@ -21,4 +21,15 @@ Vocabulary/ORBvoc.txt
 build/
 *~
 lib/
-
+cmake-build*/
+dataset/
+kitti_poses_and_timestamps_to_trajectory.py
+result/
+.idea/
+.gitignore
+00_gt.txt
+Thirdparty/Eigen3
+Thirdparty/OpenCV
+Thirdparty/Pangolin
+Thirdparty/easy_profiler
+Thirdparty/spdlog

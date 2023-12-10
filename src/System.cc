@@ -26,6 +26,8 @@
 #include <pangolin/pangolin.h>
 #include <iomanip>
 
+#include "easy/profiler.h"
+
 namespace ORB_SLAM2
 {
 
@@ -71,10 +73,10 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
     cout << "Vocabulary loaded!" << endl << endl;
 
-    //Create KeyFrame Database
+    /// Create KeyFrame Database : Loop과 Relocalization을 인지
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
 
-    //Create the Map
+    /// Create the Map : 3D 세계의 구조를 저장
     mpMap = new Map();
 
     //Create Drawers. These are used by the Viewer
@@ -217,6 +219,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
 
 cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
 {
+    EASY_BLOCK("TRACKING_THREAD", profiler::colors::DeepOrange600);
     if(mSensor!=MONOCULAR)
     {
         cerr << "ERROR: you called TrackMonocular but input sensor was not set to Monocular." << endl;
@@ -264,6 +267,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
 
+    EASY_END_BLOCK
     return Tcw;
 }
 
