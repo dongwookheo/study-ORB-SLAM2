@@ -1,6 +1,6 @@
 message(STATUS "Finding Easy-profiler...")
 
-find_package(easy_profiler HINTS ${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/easy_profiler/install/lib/cmake/easy_profiler)
+find_package(easy_profiler REQUIRED HINTS ${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/easy_profiler/install/lib/cmake/easy_profiler)
 
 if(${easy_profiler_FOUND})
     message(STATUS "Found: Easy-profiler - ${easy_profiler_INCLUDE_DIRS}")
